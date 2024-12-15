@@ -1,0 +1,1 @@
+If the pattern that have you entered didn't clear some strings, it is either because you didn't allocate enough memory to read that region where the string is stored, or the protection of the region is PAGE_READONLY.
