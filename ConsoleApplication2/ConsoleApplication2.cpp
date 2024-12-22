@@ -11,7 +11,7 @@ void __forceinline Overwrite(HANDLE hProcess, std::vector<uintptr_t>patternAddre
 
 DWORD __fastcall __gt_PID(const wchar_t* procNameW) {
 
-	DWORD  PID		 = 0;
+	DWORD  PID = 0;
 	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
 	PROCESSENTRY32 PE;
@@ -67,7 +67,7 @@ int main() {
 
 	SIZE_T strLength = str.size() * sizeof(wchar_t);
 	std::vector<BYTE> buffer(strLength, 0x00);
-	
+
 
 	auto start = std::chrono::high_resolution_clock::now();
 
@@ -91,7 +91,7 @@ std::vector<uintptr_t> __forceinline __scan(std::wstring& str, HANDLE hProcess, 
 	SYSTEM_INFO s;
 	GetSystemInfo(&s);
 
-	uintptr_t Address    = (uintptr_t)s.lpMinimumApplicationAddress;
+	uintptr_t Address = (uintptr_t)s.lpMinimumApplicationAddress;
 	uintptr_t maxAddress = (uintptr_t)s.lpMaximumApplicationAddress;
 
 	std::vector<uintptr_t> patternAddresses;
@@ -108,10 +108,10 @@ std::vector<uintptr_t> __forceinline __scan(std::wstring& str, HANDLE hProcess, 
 		heapAllocated += 1;
 	}
 
-	BYTE* buffer		= new BYTE[heapAllocated * 1024000];
+	BYTE* buffer = new BYTE[heapAllocated * 1024000];
 
-	SIZE_T stringSize	=  str.size() * sizeof(wchar_t);
-	SIZE_T stringSize2	= str.size() * sizeof(char);
+	SIZE_T stringSize = str.size() * sizeof(wchar_t);
+	SIZE_T stringSize2 = str.size() * sizeof(char);
 
 
 	while (Address < maxAddress) {
@@ -125,17 +125,12 @@ std::vector<uintptr_t> __forceinline __scan(std::wstring& str, HANDLE hProcess, 
 
 		if (mbi.State == 0x00001000 &&
 			(mbi.Protect == 0x04 || mbi.Protect == 0x40)) {
+				
+			Address += mbi.RegionSize;
 
-			while (heapAllocated * 1024000 < mbi.RegionSize) {
-				std::cout << "Skipped 0x" << std::hex << Address
-					<< " Size: MB " << std::dec << mbi.RegionSize / 1024000 << std::endl;
-
-				Address += mbi.RegionSize;
-
-				if (!VirtualQuery(reinterpret_cast<LPCVOID>(Address), &mbi, sizeof(mbi))) {
-					std::cerr << "Failed to query memory at address 0x" << std::hex << Address << std::endl;
-					break;
-				}
+			if (!VirtualQuery(reinterpret_cast<LPCVOID>(Address), &mbi, sizeof(mbi))) {
+				std::cerr << "Failed to query memory at address 0x" << std::hex << Address << std::endl;
+				break;
 			}
 
 			NTSTATUS readStatus = NtReadVirtualMemory(hProcess, reinterpret_cast<PVOID>(Address), buffer, mbi.RegionSize, (PULONG)&bytesRead);
@@ -157,21 +152,26 @@ std::vector<uintptr_t> __forceinline __scan(std::wstring& str, HANDLE hProcess, 
 				}
 			}
 			else {
-				std::cout << "NtReadVirtualMemory failed at 0x" << std::hex << Address << " | NTSTATUS 0x" << readStatus << std::endl;
+				if (heapAllocated * 1024000 < mbi.RegionSize) {
+					std::cout << "Skipped 0x" << std::hex << Address << " Size: MB " << std::dec << mbi.RegionSize / 1024000 << std::endl; 
+				}
+				else {
+					std::cout << "NtReadVirtualMemory failed at 0x" << std::hex << Address << " | NTSTATUS 0x" << readStatus << std::endl;
+				}
 			}
-        }
-        Address += mbi.RegionSize;
-    }
-    VirtualFree(buffer, 0, MEM_RELEASE);
-    return patternAddresses;
+		}
+		Address += mbi.RegionSize;
+	}
+	VirtualFree(buffer, 0, MEM_RELEASE);
+	return patternAddresses;
 };
 
 void __forceinline Overwrite(HANDLE hProcess, std::vector<uintptr_t>patternAddresses, HMODULE hntdll, SIZE_T strLength, std::vector<BYTE> buffer) {
 
 	pNtWriteVirtualMemory NtWriteVirtualMemory = (pNtWriteVirtualMemory)GetProcAddress(hntdll, "NtWriteVirtualMemory");
-	
+
 	for (const auto& patternAddress : patternAddresses) {
-		NTSTATUS writeStatus = NtWriteVirtualMemory(hProcess, reinterpret_cast<PVOID>(patternAddress), buffer.data() , strLength, nullptr);
+		NTSTATUS writeStatus = NtWriteVirtualMemory(hProcess, reinterpret_cast<PVOID>(patternAddress), buffer.data(), strLength, nullptr);
 		std::cout << "[+] Deleted string at address: 0x" << std::hex << patternAddress << std::endl;
 	}
 }
