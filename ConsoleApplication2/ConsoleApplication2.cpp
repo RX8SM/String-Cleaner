@@ -49,15 +49,12 @@ int main() {
 	std::vector<BYTE> buffer(strLength, 0x00);
 
 
-	auto start = std::chrono::high_resolution_clock::now();
 
 
 	std::vector<uintptr_t> patternAddresses = __scan(str, hProcess, hntdll);
 	Overwrite(hProcess, patternAddresses, hntdll, strLength, buffer);
 
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	std::cout << "Time: " << duration << std::dec << " milliseconds" << std::endl;
+	std::cout << "Finished." << std::endl;
 	system("pause");
 
 };
